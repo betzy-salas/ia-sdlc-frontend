@@ -1,0 +1,90 @@
+.bar {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.inner {
+  padding: 10px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.menuButton {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-on-brand);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuButton:hover {
+  background: var(--color-brand-active);
+}
+
+.user {
+  font-weight: 500;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout {
+  min-height: var(--touch-target);
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-on-brand);
+  background: transparent;
+  color: var(--color-on-brand);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout:hover {
+  background: var(--color-brand-active);
+}
+
+.bar :focus-visible {
+  outline-color: #ffffff;
+}
+
+@media (max-width: 520px) {
+  .inner {
+    padding: 10px 14px;
+  }
+  .title {
+    font-size: 16px;
+  }
+  .user {
+    max-width: 130px;
+  }
+}

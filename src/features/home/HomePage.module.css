@@ -1,0 +1,91 @@
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card {
+  flex: 1 1 190px;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  background: var(--phase-strong);
+  color: #ffffff;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.number {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.body {
+  flex: 1 1 auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.approver,
+.noAgents {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.counts {
+  margin: auto 0 0;
+  padding-top: 6px;
+  width: 100%;
+  display: flex;
+  gap: 18px;
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+}
+
+.count dt {
+  order: 2;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.count dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.1;
+}

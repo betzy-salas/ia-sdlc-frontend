@@ -1,0 +1,38 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Menú y contenido comparten la fila. En pantallas angostas el contenido baja debajo del menú. */
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.content {
+  flex: 1 1 420px;
+  min-width: 0;
+  padding: 28px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.demo {
+  align-self: flex-end;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-demo-bg);
+  color: var(--color-demo-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .content {
+    padding: 20px 14px 40px;
+  }
+}

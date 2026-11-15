@@ -1,0 +1,62 @@
+.refined {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.statement {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+}
+
+.statement dt {
+  font-weight: 600;
+  color: var(--phase-on-soft);
+}
+
+.statement dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--color-text-secondary);
+}
+
+.list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ambiguities {
+  background: var(--color-pending-bg);
+  color: var(--color-pending-text);
+  border-radius: var(--radius-box);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ambiguities .subtitle {
+  color: var(--color-pending-text);
+}
+
+.none {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}

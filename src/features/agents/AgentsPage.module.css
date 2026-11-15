@@ -1,0 +1,66 @@
+.versionEmpty {
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.body {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.name a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.name a:hover,
+.name a:focus-visible {
+  text-decoration: underline;
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+}
+
+.instructions {
+  width: 100%;
+}
+
+.instructions summary {
+  min-height: var(--touch-target);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-link);
+}
+
+.instructions pre {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--color-bg);
+  border-radius: var(--radius-box);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.sha {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
