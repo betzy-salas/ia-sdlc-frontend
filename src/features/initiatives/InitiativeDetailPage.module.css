@@ -1,10 +1,39 @@
-.back {
-  align-self: flex-start;
+/* Migas: Proyectos / proyecto / iniciativa */
+.crumbs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  font-size: 13px;
+}
+
+.crumbs li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.crumbs li + li::before {
+  content: '/';
+  color: var(--color-text-secondary);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
   min-height: var(--touch-target);
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.crumbCurrent {
+  min-height: var(--touch-target);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .description {
@@ -173,4 +202,14 @@
 .banner a {
   color: inherit;
   padding: 10px 0;
+}
+
+/* Enlace de regreso (lo usa el detalle de agente). */
+.back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch-target);
+  font-weight: 600;
 }

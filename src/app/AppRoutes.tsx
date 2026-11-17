@@ -7,6 +7,7 @@ import { AgentsPage } from '../features/agents/AgentsPage';
 import { ApprovalsPage } from '../features/approvals/ApprovalsPage';
 import { ExecutionsPage } from '../features/executions/ExecutionsPage';
 import { HomePage } from '../features/home/HomePage';
+import { InitiativeDetailPage } from '../features/initiatives/InitiativeDetailPage';
 import { ProjectDetailPage } from '../features/projects/ProjectDetailPage';
 import { ProjectsPage } from '../features/projects/ProjectsPage';
 import { SquadsPage } from '../features/squads/SquadsPage';
@@ -22,6 +23,7 @@ export function AppRoutes() {
           <Route index element={<HomePage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="initiatives/:initiativeId" element={<InitiativeDetailPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="agents/:agentId" element={<AgentDetailPage />} />

@@ -105,16 +105,25 @@ export function createHttpClient(options: HttpClientOptions): ApiClient {
     listProjects: () => request('GET', '/projects'),
     createProject: (body) => request('POST', '/projects', body),
     getProject: (projectId) => request('GET', `/projects/${id(projectId)}`),
-    addStory: (projectId, body) => request('POST', `/projects/${id(projectId)}/stories`, body),
-    deleteStory: (projectId, storyId) =>
-      request('DELETE', `/projects/${id(projectId)}/stories/${id(storyId)}`),
 
-    executeRequirements: (projectId) =>
-      request('POST', `/projects/${id(projectId)}/phases/REQUIREMENTS/executions`),
+    createInitiative: (projectId, body) => request('POST', `/projects/${id(projectId)}/initiatives`, body),
+    listInitiatives: (filters) =>
+      request('GET', withQuery('/initiatives', { projectId: filters?.projectId, phase: filters?.phase })),
+    getInitiative: (initiativeId) => request('GET', `/initiatives/${id(initiativeId)}`),
+    addStory: (initiativeId, body) => request('POST', `/initiatives/${id(initiativeId)}/stories`, body),
+    deleteStory: (initiativeId, storyId) =>
+      request('DELETE', `/initiatives/${id(initiativeId)}/stories/${id(storyId)}`),
+
+    executeRequirements: (initiativeId) =>
+      request('POST', `/initiatives/${id(initiativeId)}/phases/REQUIREMENTS/executions`),
     listExecutions: (filters) =>
       request(
         'GET',
-        withQuery('/executions', { projectId: filters?.projectId, status: filters?.status }),
+        withQuery('/executions', {
+          initiativeId: filters?.initiativeId,
+          projectId: filters?.projectId,
+          status: filters?.status,
+        }),
       ),
     getExecution: (executionId) => request('GET', `/executions/${id(executionId)}`),
 

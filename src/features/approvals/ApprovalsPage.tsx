@@ -31,8 +31,12 @@ function ApprovalCard({ execution }: { execution: Execution }) {
         <PhaseBadge phase={execution.phaseCode} size="lg" />
         <div className={shared.main}>
           <h2 className={shared.itemTitle}>
-            <Link to={`/projects/${execution.project.id}`}>{execution.project.name}</Link> · Historias refinadas
+            <Link to={`/initiatives/${execution.initiative.id}`}>{execution.initiative.name}</Link> · Historias
+            refinadas
           </h2>
+          <p className={shared.meta}>
+            Proyecto: <Link to={`/projects/${execution.project.id}`}>{execution.project.name}</Link>
+          </p>
           <p className={shared.meta}>
             {PHASE_LABELS[execution.phaseCode]} · Generó: {execution.agent.name} v{execution.agent.version} ·
             Lanzó: {execution.launchedBy.fullName} · {formatDateTime(execution.createdAt)}
@@ -75,7 +79,7 @@ export function ApprovalsPage() {
       ) : pending.data.length === 0 ? (
         <EmptyState
           title="No tienes nada por aprobar"
-          text="Aquí aparece lo que proponen los agentes en los proyectos de tus squads, según tu rol."
+          text="Aquí aparece lo que proponen los agentes en las iniciativas de tus squads, según tu rol."
           action={<ButtonLink to="/projects">Ir a proyectos</ButtonLink>}
         />
       ) : (

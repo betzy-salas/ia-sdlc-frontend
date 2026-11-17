@@ -2,7 +2,7 @@
 
 Aplicación web donde, en cada fase del proceso de desarrollo, **un agente de IA propone un artefacto y una persona con cierto rol lo aprueba** (gate).
 
-Alcance de la entrega 1: ingreso y registro, squads y roles, catálogo de agentes con versiones, proyectos con historias de usuario y la fase 1 (Requerimientos): desde el proyecto se ejecuta el agente de refinamiento, se ve el resultado y queda pendiente de la aprobación del Product Owner en «Por aprobar».
+Alcance de la entrega 1: ingreso y registro, squads y roles, catálogo de agentes con versiones, proyectos con iniciativas e historias de usuario y la fase 1 (Requerimientos): desde la iniciativa se ejecuta el agente de refinamiento, se ve el resultado y queda pendiente de la aprobación del Product Owner en «Por aprobar».
 
 El contrato con el backend está en [`specs/contrato-api.md`](specs/contrato-api.md) y es la fuente de verdad de rutas, campos y enums.
 
@@ -35,6 +35,7 @@ Equivale a `VITE_USE_MOCKS=true vite`. La app usa un cliente de API en memoria (
 
 - Ingresa como Product Owner con `ana@demo.local` / `demo1234` (la pantalla de ingreso lo recuerda).
 - Otros usuarios de ejemplo, misma contraseña: `luis@demo.local` (líder técnico y PO suplente), `marta@demo.local` (arquitecta), `diego@demo.local` (desarrollador), `carla@demo.local` (QA).
+- Los datos de ejemplo traen el proyecto «Apertura de cuenta digital» con dos iniciativas en fases distintas: «Validación de identidad» (en Requerimientos, con historias sin refinar) y «Entrega de tarjeta de débito» (Requerimientos aprobado, ya en Análisis).
 - Los datos viven solo en memoria: **al recargar la página vuelven los datos de ejemplo**.
 - El «agente» del modo demo no llama a ningún modelo: arma un refinamiento determinista a partir del texto de la historia.
 
@@ -57,6 +58,20 @@ Se pueden poner en un archivo `.env.local` (ver `.env.example`).
 | `npm run lint` | ESLint. |
 | `npm test` | Pruebas con Vitest y React Testing Library. |
 
+## Modelo y flujo
+
+Tres niveles: **Proyecto** (lo estable: nombre, descripción y squad; no recorre fases) → **Iniciativa** (un lote de trabajo del proyecto; es la que recorre las cinco fases y pasa por los gates) → **Historia** (pertenece a una iniciativa). Un proyecto puede tener varias iniciativas, cada una en una fase distinta.
+
+Flujo: crear proyecto → crear iniciativa → agregar historias → «Refinar con el agente» → aprobar en «Por aprobar».
+
+| Ruta | Pantalla |
+|---|---|
+| `/projects` | Proyectos: nombre, squad y cantidad de iniciativas |
+| `/projects/:projectId` | Proyecto: sus datos y sus iniciativas (fase actual y cantidad de historias) |
+| `/initiatives/:initiativeId` | Iniciativa: recorrido por las fases con su gate, historias y refinamiento |
+
+A las iniciativas se llega desde el proyecto; el menú lateral no cambia.
+
 ## Stack
 
 React 19 + TypeScript estricto + Vite, React Router, TanStack Query, CSS Modules con variables CSS (tokens). Sin librería de componentes. Íconos SVG propios, de trazo, en línea. Vitest + React Testing Library. ESLint.
@@ -73,7 +88,8 @@ src/
   components/ Piezas compartidas: botón, tarjeta, etiquetas de estado, campos, estados de carga/vacío/error, íconos
   features/
     home/        Inicio: las cinco fases (GET /dashboard/phases)
-    projects/    Lista, detalle, recorrido por fases, historias y refinamiento
+    projects/    Lista de proyectos y detalle del proyecto con sus iniciativas
+    initiatives/ Detalle de la iniciativa: recorrido por fases, historias y refinamiento
     approvals/   Por aprobar y formulario de decisión
     agents/      Catálogo, registro, detalle, versiones y estado
     executions/  Lista de ejecuciones
@@ -88,7 +104,7 @@ src/
 - **Un solo punto de acceso a la API.** `ApiClient` (`src/api/client.ts`) es la interfaz; la implementan `createHttpClient` y `createMockClient`. Las pantallas la obtienen con `useApi()`, así que no saben cuál de las dos usan. Las pruebas inyectan el cliente en memoria por `AppProviders`.
 - **El front no implementa reglas de negocio.** Muestra el `{ code, message }` que devuelve el back, tal cual (mensaje y código). La única validación propia es la que pidió la usuaria: exigir comentario para «Pedir cambios» y «Rechazar» antes de enviar. Las acciones que se muestran u ocultan (agregar historias, refinar) dependen del estado que informa el back (`journey[].progress`), no de cálculos del front.
 - **Sesión.** El token vive en memoria y se respalda en `sessionStorage` (sobrevive a recargar, no a cerrar la pestaña). Un 401 en una ruta autenticada borra el token, limpia la caché de consultas y lleva a `/login`. Un 401 de `/auth/login` solo muestra el error.
-- **Consultas.** Tras ejecutar el agente o decidir un gate se invalidan proyectos, ejecuciones, pendientes e Inicio (`invalidateWorkflow`). Los 4xx no se reintentan.
+- **Consultas.** Tras ejecutar el agente o decidir un gate se invalidan iniciativas, proyectos, ejecuciones, pendientes e Inicio (`invalidateWorkflow`); tras crear una iniciativa o cambiar sus historias, iniciativas, proyectos e Inicio (`invalidateStructure`). Los 4xx no se reintentan.
 - **Menú lateral en el flujo.** Mide 270 px fijos y comparte fila (flex) con el contenido: no lo tapa. Cerrado, el contenido usa todo el ancho; elegir una opción no lo cierra; en pantallas angostas el contenido baja debajo del menú. Solo el botón de tres líneas lo abre o lo cierra.
 - **Color por fase con tokens.** `data-phase="REQUIREMENTS"` (etc.) define `--phase-strong`, `--phase-soft` y `--phase-on-soft`; los componentes solo usan esas variables.
 - **Sin tablas.** Todo listado es una lista (`ul`/`ol`) de tarjetas.
@@ -97,7 +113,9 @@ src/
 ## Lecturas del contrato que conviene confirmar con el backend
 
 - `comment` al aprobar: el front envía `null` cuando no se escribe comentario.
-- El contrato no define el código de error al agregar o borrar historias fuera de `IN_PROGRESS`; el front muestra el que llegue (el modo demo usa `PHASE_AWAITING_GATE` / `PHASE_ALREADY_APPROVED`).
+- Nombre de proyecto repetido: el contrato solo exige nombre único para la iniciativa dentro del proyecto; el modo demo además rechaza proyectos con el mismo nombre (`DUPLICATE_NAME`), como antes.
+- `GET /initiatives` (con `?projectId=&phase=`) está en el cliente pero ninguna pantalla lo usa: las iniciativas se leen de `project.initiatives`.
+- Los filtros `initiativeId` y `projectId` de `GET /executions` están en el cliente; la pantalla de Ejecuciones solo filtra por estado.
 - `pendingApprovals` de `/dashboard/phases`: el modo demo cuenta todos los pendientes de la fase, no solo los del usuario. El contador del menú sí usa `/approvals/pending` (los del usuario).
 - `versions[].instructions` se trata como opcional (solo llega en `GET /agents/{id}`).
 - «Squads y roles» usa `GET /squads` (ya trae los integrantes); `GET /squads/{id}` está en el cliente pero ninguna pantalla lo necesita.

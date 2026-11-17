@@ -7,6 +7,7 @@ import type {
   SquadRole,
   StoryOrigin,
 } from '../api/types';
+import { refineStory } from './refine';
 
 // Formas internas del "servidor" en memoria. Las respuestas se arman con las formas del contrato.
 
@@ -45,20 +46,30 @@ export interface DbStory {
   description: string;
   origin: StoryOrigin;
 }
+/** Lo estable: no recorre fases ni tiene historias directas. */
 export interface DbProject {
   id: string;
   name: string;
   description: string;
   squadId: string;
+}
+/** Lote de trabajo de un proyecto: recorre las fases y tiene las historias. */
+export interface DbInitiative {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
   currentPhase: PhaseCode;
   progress: Record<PhaseCode, PhaseProgress>;
   stories: DbStory[];
+  createdAt: string;
 }
 export interface Db {
   users: DbUser[];
   squads: DbSquad[];
   agents: DbAgent[];
   projects: DbProject[];
+  initiatives: DbInitiative[];
   executions: Execution[];
 }
 
@@ -97,13 +108,43 @@ function plannedAgent(id: string, name: string, phaseCode: PhaseCode, path: stri
   };
 }
 
+export function initialProgress(): Record<PhaseCode, PhaseProgress> {
+  return {
+    REQUIREMENTS: 'IN_PROGRESS',
+    ANALYSIS: 'PENDING',
+    DESIGN: 'PENDING',
+    CONSTRUCTION: 'PENDING',
+    TESTING: 'PENDING',
+  };
+}
+
+/** Ids de los datos de ejemplo que usan las pruebas y las capturas. */
+export const DEMO_IDS = {
+  squad: 's-0001',
+  project: 'p-0001',
+  /** Iniciativa en Requerimientos, con historias sin refinar. */
+  initiativeInRequirements: 'i-0001',
+  /** Iniciativa con Requerimientos aprobado, ya en Análisis. */
+  initiativeInAnalysis: 'i-0002',
+} as const;
+
+const APPROVED_STORIES: DbStory[] = [
+  {
+    id: 'st-0003',
+    title: 'Recibir la tarjeta de débito en casa',
+    description:
+      'Como cliente con cuenta nueva, quiero pedir que me envíen la tarjeta de débito a mi dirección, para usarla sin ir a una agencia.',
+    origin: 'EXISTING',
+  },
+];
+
 export function createSeedDb(): Db {
   const u = DEMO_USERS;
   return {
     users: Object.values(u).map((user) => ({ ...user, password: DEMO_PASSWORD })),
     squads: [
       {
-        id: 's-0001',
+        id: DEMO_IDS.squad,
         name: 'Squad Demo',
         members: [
           { id: 'm-0001', userId: u.productOwner.id, role: 'PRODUCT_OWNER', substitute: false },
@@ -123,7 +164,7 @@ export function createSeedDb(): Db {
         status: 'PILOT',
         currentVersion: '0.1.0',
         description:
-          'Toma las historias del proyecto y las deja en formato como/quiero/para, con criterios de aceptación y ambigüedades por resolver.',
+          'Toma las historias de la iniciativa y las deja en formato como/quiero/para, con criterios de aceptación y ambigüedades por resolver.',
         repositoryUrl: REPO,
         repositoryPath: 'agents/refinamiento',
         ownerUserId: u.productOwner.id,
@@ -145,18 +186,27 @@ export function createSeedDb(): Db {
     ],
     projects: [
       {
-        id: 'p-0001',
+        id: DEMO_IDS.project,
         name: 'Apertura de cuenta digital',
         description: 'Permitir que una persona abra su cuenta de ahorros desde el celular, sin ir a una agencia.',
-        squadId: 's-0001',
+        squadId: DEMO_IDS.squad,
+      },
+      {
+        id: 'p-0002',
+        name: 'Transferencias inmediatas',
+        description: 'Enviar dinero a otros bancos en segundos, a cualquier hora.',
+        squadId: DEMO_IDS.squad,
+      },
+    ],
+    initiatives: [
+      {
+        id: DEMO_IDS.initiativeInRequirements,
+        projectId: DEMO_IDS.project,
+        name: 'Validación de identidad',
+        description: 'Primer lote: que el cliente nuevo se identifique y elija su cuenta desde el celular.',
         currentPhase: 'REQUIREMENTS',
-        progress: {
-          REQUIREMENTS: 'IN_PROGRESS',
-          ANALYSIS: 'PENDING',
-          DESIGN: 'PENDING',
-          CONSTRUCTION: 'PENDING',
-          TESTING: 'PENDING',
-        },
+        progress: initialProgress(),
+        createdAt: '2026-11-03T14:00:00Z',
         stories: [
           {
             id: 'st-0001',
@@ -173,7 +223,39 @@ export function createSeedDb(): Db {
           },
         ],
       },
+      {
+        id: DEMO_IDS.initiativeInAnalysis,
+        projectId: DEMO_IDS.project,
+        name: 'Entrega de tarjeta de débito',
+        description: 'Segundo lote: que la tarjeta llegue a la casa del cliente.',
+        currentPhase: 'ANALYSIS',
+        progress: { ...initialProgress(), REQUIREMENTS: 'APPROVED', ANALYSIS: 'IN_PROGRESS' },
+        createdAt: '2026-10-20T14:00:00Z',
+        stories: APPROVED_STORIES,
+      },
     ],
-    executions: [],
+    executions: [
+      {
+        id: 'e-0001',
+        initiative: { id: DEMO_IDS.initiativeInAnalysis, name: 'Entrega de tarjeta de débito' },
+        project: { id: DEMO_IDS.project, name: 'Apertura de cuenta digital' },
+        phaseCode: 'REQUIREMENTS',
+        agent: { id: 'a-0001', name: 'Agente de refinamiento', version: '0.1.0' },
+        launchedBy: { id: u.developer.id, fullName: u.developer.fullName },
+        status: 'ACCEPTED',
+        createdAt: '2026-10-21T15:30:00Z',
+        refinedStories: APPROVED_STORIES.map((story) => ({
+          storyId: story.id,
+          originalTitle: story.title,
+          refined: refineStory(story.title, story.description),
+        })),
+        decision: {
+          decision: 'APPROVE',
+          decidedBy: { id: u.productOwner.id, fullName: u.productOwner.fullName },
+          decidedAt: '2026-10-22T09:10:00Z',
+          comment: null,
+        },
+      },
+    ],
   };
 }

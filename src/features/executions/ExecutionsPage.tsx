@@ -52,7 +52,7 @@ export function ExecutionsPage() {
         ) : (
           <EmptyState
             title="Aún no hay ejecuciones"
-            text="Abre un proyecto con historias y usa «Refinar con el agente»."
+            text="Abre una iniciativa con historias y usa «Refinar con el agente»."
             action={<ButtonLink to="/projects">Ir a proyectos</ButtonLink>}
           />
         )
@@ -63,9 +63,12 @@ export function ExecutionsPage() {
               <PhaseBadge phase={execution.phaseCode} />
               <div className={shared.main}>
                 <h2 className={shared.itemTitle}>
-                  <Link to={`/projects/${execution.project.id}`}>{execution.project.name}</Link> ·{' '}
+                  <Link to={`/initiatives/${execution.initiative.id}`}>{execution.initiative.name}</Link> ·{' '}
                   {PHASE_LABELS[execution.phaseCode]}
                 </h2>
+                <p className={shared.meta}>
+                  Proyecto: <Link to={`/projects/${execution.project.id}`}>{execution.project.name}</Link>
+                </p>
                 <p className={shared.meta}>
                   {execution.agent.name} v{execution.agent.version} · Lanzó: {execution.launchedBy.fullName} ·{' '}
                   {formatDateTime(execution.createdAt)}

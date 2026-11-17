@@ -148,7 +148,7 @@ export interface ChangeAgentStatusRequest {
   status: AgentStatus;
 }
 
-// --- Proyectos e historias
+// --- Proyectos, iniciativas e historias
 export interface NamedRef {
   id: string;
   name: string;
@@ -170,6 +170,7 @@ export interface Story {
 }
 export interface ExecutionSummary {
   id: string;
+  initiative: NamedRef;
   project: NamedRef;
   phaseCode: PhaseCode;
   agent: { id: string; name: string; version: string };
@@ -185,26 +186,56 @@ export interface PhaseStep {
   approverRole: SquadRole;
   lastExecution: ExecutionSummary | null;
 }
+/** Lote de trabajo dentro de un proyecto: es la unidad que recorre las fases. */
+export interface InitiativeSummary {
+  id: string;
+  name: string;
+  project: NamedRef;
+  squad: NamedRef;
+  currentPhase: PhaseCode;
+  completed: boolean;
+  storyCount: number;
+  createdAt: string;
+}
+export interface Initiative {
+  id: string;
+  name: string;
+  description: string;
+  project: NamedRef;
+  squad: NamedRef;
+  currentPhase: PhaseCode;
+  completed: boolean;
+  stories: Story[];
+  journey: PhaseStep[];
+  createdAt: string;
+}
+/** Lo estable: nombre, descripción y squad. No recorre fases. */
 export interface ProjectSummary {
   id: string;
   name: string;
+  description: string;
   squad: NamedRef;
-  currentPhase: PhaseCode;
-  storyCount: number;
+  initiativeCount: number;
 }
 export interface Project {
   id: string;
   name: string;
   description: string;
   squad: NamedRef;
-  currentPhase: PhaseCode;
-  stories: Story[];
-  journey: PhaseStep[];
+  initiatives: InitiativeSummary[];
 }
 export interface CreateProjectRequest {
   name: string;
   description: string;
   squadId: string;
+}
+export interface CreateInitiativeRequest {
+  name: string;
+  description: string;
+}
+export interface InitiativeFilters {
+  projectId?: string;
+  phase?: PhaseCode;
 }
 export interface CreateStoryRequest {
   title: string;
@@ -229,6 +260,7 @@ export interface Execution extends ExecutionSummary {
   decision: ExecutionDecision | null;
 }
 export interface ExecutionFilters {
+  initiativeId?: string;
   projectId?: string;
   status?: ExecutionStatus;
 }
@@ -244,6 +276,6 @@ export interface DashboardPhase {
   name: string;
   approverRole: SquadRole;
   agents: { id: string; name: string; status: AgentStatus }[];
-  projectsInPhase: number;
+  initiativesInPhase: number;
   pendingApprovals: number;
 }

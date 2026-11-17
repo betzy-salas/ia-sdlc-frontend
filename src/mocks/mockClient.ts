@@ -4,7 +4,10 @@ import type {
   Agent,
   Execution,
   ExecutionSummary,
+  Initiative,
+  InitiativeSummary,
   Member,
+  NamedRef,
   PhaseCode,
   PhaseStep,
   Project,
@@ -14,7 +17,17 @@ import type {
   User,
 } from '../api/types';
 import { refineStory } from './refine';
-import { createSeedDb, PHASE_SEED, type Db, type DbAgent, type DbProject, type DbSquad, type DbUser } from './seed';
+import {
+  createSeedDb,
+  initialProgress,
+  PHASE_SEED,
+  type Db,
+  type DbAgent,
+  type DbInitiative,
+  type DbProject,
+  type DbSquad,
+  type DbUser,
+} from './seed';
 
 export interface MockClientOptions extends ClientSession {
   /** Demora simulada de cada llamada, en milisegundos. */
@@ -33,8 +46,8 @@ function clone<T>(value: T): T {
 }
 
 function summaryOf(execution: Execution): ExecutionSummary {
-  const { id, project, phaseCode, agent, launchedBy, status, createdAt } = execution;
-  return clone({ id, project, phaseCode, agent, launchedBy, status, createdAt });
+  const { id, initiative, project, phaseCode, agent, launchedBy, status, createdAt } = execution;
+  return clone({ id, initiative, project, phaseCode, agent, launchedBy, status, createdAt });
 }
 
 /**
@@ -123,13 +136,13 @@ export function createMockClient(options: MockClientOptions): ApiClient {
     };
   }
 
-  function projectExecutions(projectId: string): Execution[] {
-    return db.executions.filter((execution) => execution.project.id === projectId);
+  function initiativeExecutions(initiativeId: string): Execution[] {
+    return db.executions.filter((execution) => execution.initiative.id === initiativeId);
   }
 
   /** `story.refined` refleja la última ejecución no rechazada. */
-  function refinedFor(projectId: string, storyId: string): RefinedStory | null {
-    const executions = projectExecutions(projectId).filter(
+  function refinedFor(initiativeId: string, storyId: string): RefinedStory | null {
+    const executions = initiativeExecutions(initiativeId).filter(
       (execution) => execution.status !== 'REJECTED' && execution.status !== 'FAILED',
     );
     for (const execution of executions.reverse()) {
@@ -139,31 +152,74 @@ export function createMockClient(options: MockClientOptions): ApiClient {
     return null;
   }
 
-  function toProject(project: DbProject): Project {
-    const squad = db.squads.find((candidate) => candidate.id === project.squadId);
-    const executions = projectExecutions(project.id);
+  function projectOf(initiative: DbInitiative): DbProject | undefined {
+    return db.projects.find((candidate) => candidate.id === initiative.projectId);
+  }
+
+  function projectRef(initiative: DbInitiative): NamedRef {
+    return { id: initiative.projectId, name: projectOf(initiative)?.name ?? 'Proyecto eliminado' };
+  }
+
+  function squadRef(squadId: string | undefined): NamedRef {
+    const squad = db.squads.find((candidate) => candidate.id === squadId);
+    return { id: squadId ?? '', name: squad?.name ?? 'Squad eliminado' };
+  }
+
+  /** El squad de una iniciativa es el de su proyecto. */
+  function toInitiativeSummary(initiative: DbInitiative): InitiativeSummary {
+    return {
+      id: initiative.id,
+      name: initiative.name,
+      project: projectRef(initiative),
+      squad: squadRef(projectOf(initiative)?.squadId),
+      currentPhase: initiative.currentPhase,
+      completed: false,
+      storyCount: initiative.stories.length,
+      createdAt: initiative.createdAt,
+    };
+  }
+
+  function toInitiative(initiative: DbInitiative): Initiative {
+    const executions = initiativeExecutions(initiative.id);
     const journey: PhaseStep[] = PHASE_SEED.map((phase) => {
       const last = executions.filter((execution) => execution.phaseCode === phase.code).at(-1);
       return {
         phaseCode: phase.code,
         order: phase.order,
         name: phase.name,
-        progress: project.progress[phase.code],
+        progress: initiative.progress[phase.code],
         approverRole: phase.approverRole,
         lastExecution: last ? summaryOf(last) : null,
       };
     });
     return {
+      id: initiative.id,
+      name: initiative.name,
+      description: initiative.description,
+      project: projectRef(initiative),
+      squad: squadRef(projectOf(initiative)?.squadId),
+      currentPhase: initiative.currentPhase,
+      completed: false,
+      stories: initiative.stories.map<Story>((story) => ({
+        ...story,
+        refined: refinedFor(initiative.id, story.id),
+      })),
+      journey,
+      createdAt: initiative.createdAt,
+    };
+  }
+
+  function projectInitiatives(projectId: string): DbInitiative[] {
+    return db.initiatives.filter((initiative) => initiative.projectId === projectId);
+  }
+
+  function toProject(project: DbProject): Project {
+    return {
       id: project.id,
       name: project.name,
       description: project.description,
-      squad: { id: project.squadId, name: squad?.name ?? 'Squad eliminado' },
-      currentPhase: project.currentPhase,
-      stories: project.stories.map<Story>((story) => ({
-        ...story,
-        refined: refinedFor(project.id, story.id),
-      })),
-      journey,
+      squad: squadRef(project.squadId),
+      initiatives: projectInitiatives(project.id).map(toInitiativeSummary),
     };
   }
 
@@ -174,8 +230,8 @@ export function createMockClient(options: MockClientOptions): ApiClient {
     return Boolean(squad?.members.some((member) => member.userId === user.id && member.role === role));
   }
 
-  function requireStoriesEditable(project: DbProject): void {
-    const progress = project.progress.REQUIREMENTS;
+  function requireStoriesEditable(initiative: DbInitiative): void {
+    const progress = initiative.progress.REQUIREMENTS;
     if (progress === 'AWAITING_GATE') {
       fail(409, 'PHASE_AWAITING_GATE', 'Las historias no se pueden cambiar mientras el refinamiento espera aprobación.');
     }
@@ -330,16 +386,13 @@ export function createMockClient(options: MockClientOptions): ApiClient {
 
     async listProjects() {
       currentUser();
-      return db.projects.map((project) => {
-        const squad = db.squads.find((candidate) => candidate.id === project.squadId);
-        return {
-          id: project.id,
-          name: project.name,
-          squad: { id: project.squadId, name: squad?.name ?? 'Squad eliminado' },
-          currentPhase: project.currentPhase,
-          storyCount: project.stories.length,
-        };
-      });
+      return db.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        squad: squadRef(project.squadId),
+        initiativeCount: projectInitiatives(project.id).length,
+      }));
     },
 
     async createProject(body) {
@@ -355,15 +408,6 @@ export function createMockClient(options: MockClientOptions): ApiClient {
         name,
         description: (body.description ?? '').trim(),
         squadId: squad.id,
-        currentPhase: 'REQUIREMENTS',
-        progress: {
-          REQUIREMENTS: 'IN_PROGRESS',
-          ANALYSIS: 'PENDING',
-          DESIGN: 'PENDING',
-          CONSTRUCTION: 'PENDING',
-          TESTING: 'PENDING',
-        },
-        stories: [],
       };
       db.projects.push(project);
       return toProject(project);
@@ -374,40 +418,74 @@ export function createMockClient(options: MockClientOptions): ApiClient {
       return toProject(findOr404(db.projects, projectId, 'un proyecto'));
     },
 
-    async addStory(projectId, body) {
+    async createInitiative(projectId, body) {
       currentUser();
       const project = findOr404(db.projects, projectId, 'un proyecto');
-      requireStoriesEditable(project);
+      const name = requireText(body.name, 'nombre');
+      if (projectInitiatives(project.id).some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+        fail(409, 'DUPLICATE_NAME', 'Este proyecto ya tiene una iniciativa con ese nombre.');
+      }
+      const initiative: DbInitiative = {
+        id: newId(),
+        projectId: project.id,
+        name,
+        description: (body.description ?? '').trim(),
+        currentPhase: 'REQUIREMENTS',
+        progress: initialProgress(),
+        stories: [],
+        createdAt: new Date().toISOString(),
+      };
+      db.initiatives.push(initiative);
+      return toInitiative(initiative);
+    },
+
+    async listInitiatives(filters) {
+      currentUser();
+      return db.initiatives
+        .filter((initiative) => !filters?.projectId || initiative.projectId === filters.projectId)
+        .filter((initiative) => !filters?.phase || initiative.currentPhase === filters.phase)
+        .map(toInitiativeSummary);
+    },
+
+    async getInitiative(initiativeId) {
+      currentUser();
+      return toInitiative(findOr404(db.initiatives, initiativeId, 'una iniciativa'));
+    },
+
+    async addStory(initiativeId, body) {
+      currentUser();
+      const initiative = findOr404(db.initiatives, initiativeId, 'una iniciativa');
+      requireStoriesEditable(initiative);
       const story = {
         id: newId(),
         title: requireText(body.title, 'título'),
         description: requireText(body.description, 'descripción'),
         origin: body.origin,
       };
-      project.stories.push(story);
+      initiative.stories.push(story);
       return { ...story, refined: null };
     },
 
-    async deleteStory(projectId, storyId) {
+    async deleteStory(initiativeId, storyId) {
       currentUser();
-      const project = findOr404(db.projects, projectId, 'un proyecto');
-      findOr404(project.stories, storyId, 'una historia');
-      requireStoriesEditable(project);
-      project.stories = project.stories.filter((story) => story.id !== storyId);
+      const initiative = findOr404(db.initiatives, initiativeId, 'una iniciativa');
+      findOr404(initiative.stories, storyId, 'una historia');
+      requireStoriesEditable(initiative);
+      initiative.stories = initiative.stories.filter((story) => story.id !== storyId);
     },
 
-    async executeRequirements(projectId) {
+    async executeRequirements(initiativeId) {
       const user = currentUser();
-      const project = findOr404(db.projects, projectId, 'un proyecto');
+      const initiative = findOr404(db.initiatives, initiativeId, 'una iniciativa');
       const phase: PhaseCode = 'REQUIREMENTS';
-      if (project.progress[phase] === 'AWAITING_GATE') {
+      if (initiative.progress[phase] === 'AWAITING_GATE') {
         fail(409, 'PHASE_AWAITING_GATE', 'Ya hay una ejecución de esta fase esperando aprobación.');
       }
-      if (project.progress[phase] === 'APPROVED') {
+      if (initiative.progress[phase] === 'APPROVED') {
         fail(409, 'PHASE_ALREADY_APPROVED', 'La fase de Requerimientos ya fue aprobada.');
       }
-      if (project.stories.length === 0) {
-        fail(409, 'NO_STORIES', 'El proyecto no tiene historias. Agrega al menos una antes de refinar.');
+      if (initiative.stories.length === 0) {
+        fail(409, 'NO_STORIES', 'La iniciativa no tiene historias. Agrega al menos una antes de refinar.');
       }
       const agent = db.agents.find(
         (candidate) =>
@@ -420,13 +498,14 @@ export function createMockClient(options: MockClientOptions): ApiClient {
       }
       const execution: Execution = {
         id: newId(),
-        project: { id: project.id, name: project.name },
+        initiative: { id: initiative.id, name: initiative.name },
+        project: projectRef(initiative),
         phaseCode: phase,
         agent: { id: agent.id, name: agent.name, version: agent.currentVersion },
         launchedBy: { id: user.id, fullName: user.fullName },
         status: 'PENDING_APPROVAL',
         createdAt: new Date().toISOString(),
-        refinedStories: project.stories.map((story) => ({
+        refinedStories: initiative.stories.map((story) => ({
           storyId: story.id,
           originalTitle: story.title,
           refined: refineStory(story.title, story.description),
@@ -434,13 +513,14 @@ export function createMockClient(options: MockClientOptions): ApiClient {
         decision: null,
       };
       db.executions.push(execution);
-      project.progress[phase] = 'AWAITING_GATE';
+      initiative.progress[phase] = 'AWAITING_GATE';
       return clone(execution);
     },
 
     async listExecutions(filters) {
       currentUser();
       return db.executions
+        .filter((execution) => !filters?.initiativeId || execution.initiative.id === filters.initiativeId)
         .filter((execution) => !filters?.projectId || execution.project.id === filters.projectId)
         .filter((execution) => !filters?.status || execution.status === filters.status)
         .map(summaryOf)
@@ -472,15 +552,15 @@ export function createMockClient(options: MockClientOptions): ApiClient {
       if (body.decision !== 'APPROVE' && !comment) {
         fail(400, 'COMMENT_REQUIRED', 'Para pedir cambios o rechazar hay que escribir un comentario.');
       }
-      const project = findOr404(db.projects, execution.project.id, 'un proyecto');
+      const initiative = findOr404(db.initiatives, execution.initiative.id, 'una iniciativa');
       if (body.decision === 'APPROVE') {
         execution.status = 'ACCEPTED';
-        project.progress[execution.phaseCode] = 'APPROVED';
-        project.currentPhase = 'ANALYSIS';
-        project.progress.ANALYSIS = 'IN_PROGRESS';
+        initiative.progress[execution.phaseCode] = 'APPROVED';
+        initiative.currentPhase = 'ANALYSIS';
+        initiative.progress.ANALYSIS = 'IN_PROGRESS';
       } else {
         execution.status = body.decision === 'REJECT' ? 'REJECTED' : 'REWORK_REQUESTED';
-        project.progress[execution.phaseCode] = 'IN_PROGRESS';
+        initiative.progress[execution.phaseCode] = 'IN_PROGRESS';
       }
       execution.decision = {
         decision: body.decision,
@@ -501,7 +581,7 @@ export function createMockClient(options: MockClientOptions): ApiClient {
         agents: db.agents
           .filter((agent) => agent.phaseCode === phase.code)
           .map(({ id, name, status }) => ({ id, name, status })),
-        projectsInPhase: db.projects.filter((project) => project.currentPhase === phase.code).length,
+        initiativesInPhase: db.initiatives.filter((initiative) => initiative.currentPhase === phase.code).length,
         pendingApprovals: db.executions.filter(
           (execution) => execution.phaseCode === phase.code && execution.status === 'PENDING_APPROVAL',
         ).length,

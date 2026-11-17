@@ -4,7 +4,7 @@ Guía para validar y corregir el back y el front sin internet (por ejemplo, en u
 
 ## Estado al momento de escribir esta guía
 
-- **Front**: compila, pasa lint y sus 22 pruebas. Probado solo en modo demo (datos en memoria).
+- **Front**: compila, pasa lint y sus 28 pruebas. Probado solo en modo demo (datos en memoria).
 - **Back**: código completo, pero **nunca se ha compilado con Maven ni ejecutado**. Sus 32 pruebas no han corrido.
 - **Front + back juntos**: sin probar.
 
@@ -131,16 +131,18 @@ Marca cada paso que funcione.
 - [ ] Agregar al segundo usuario como desarrollador.
 - [ ] Agentes: aparece "Agente de refinamiento" en piloto, versión 0.1.0.
 - [ ] Agentes: registrar un agente nuevo y una versión.
-- [ ] Proyectos: crear un proyecto apuntando al squad.
-- [ ] Agregar una historia con "Ya tengo la historia".
+- [ ] Proyectos: crear un proyecto apuntando al squad (nombre, descripción, squad).
+- [ ] En el proyecto: crear una iniciativa con «Nueva iniciativa» (nombre, descripción); abre el detalle de la iniciativa con el recorrido por las cinco fases.
+- [ ] En la iniciativa: agregar una historia con "Ya tengo la historia".
 - [ ] Agregar una historia con "Ayúdame a construirla".
 - [ ] Pulsar "Refinar con el agente": aparece el resultado refinado y el estado pendiente de aprobación.
-- [ ] Por aprobar: el Product Owner ve la ejecución; el contador del menú muestra 1.
+- [ ] Por aprobar: el Product Owner ve la ejecución, con el nombre de la iniciativa y el del proyecto; el contador del menú muestra 1.
 - [ ] Iniciar sesión con el segundo usuario: "Por aprobar" está vacío.
 - [ ] Con el Product Owner: "Pedir cambios" sin comentario muestra error; con comentario funciona.
-- [ ] Refinar de nuevo y aprobar: el proyecto pasa a la fase de Análisis.
-- [ ] Ejecuciones: aparecen las dos ejecuciones con su estado.
-- [ ] Inicio: las tarjetas de fase muestran los conteos.
+- [ ] Refinar de nuevo y aprobar: la iniciativa pasa a la fase de Análisis.
+- [ ] Volver al proyecto y crear una segunda iniciativa: queda en Requerimientos mientras la primera sigue en Análisis (cada tarjeta muestra su fase).
+- [ ] Ejecuciones: aparecen las dos ejecuciones con su estado, su iniciativa y su proyecto.
+- [ ] Inicio: las tarjetas de fase muestran el conteo de iniciativas y de pendientes.
 - [ ] Reiniciar el back: los datos siguen ahí (PostgreSQL).
 
 ## 3. Dónde es más probable que falle el back

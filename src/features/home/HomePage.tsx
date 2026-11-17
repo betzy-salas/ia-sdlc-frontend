@@ -60,8 +60,8 @@ export function HomePage() {
                   <p className={styles.approver}>Aprueba: {ROLE_LABELS[phase.approverRole]}</p>
                   <dl className={styles.counts}>
                     <div className={styles.count}>
-                      <dt>{phase.projectsInPhase === 1 ? 'proyecto' : 'proyectos'}</dt>
-                      <dd>{phase.projectsInPhase}</dd>
+                      <dt>{phase.initiativesInPhase === 1 ? 'iniciativa' : 'iniciativas'}</dt>
+                      <dd>{phase.initiativesInPhase}</dd>
                     </div>
                     <div className={styles.count}>
                       <dt>por aprobar</dt>

@@ -14,7 +14,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { AgentStatusPill, PhaseTag, Pill } from '../../components/Pill';
 import shared from '../../components/shared.module.css';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
-import projectStyles from '../projects/ProjectDetailPage.module.css';
+import projectStyles from '../initiatives/InitiativeDetailPage.module.css';
 import styles from './AgentsPage.module.css';
 import { AgentVersionBadge, RepositoryLink } from './AgentsPage';
 

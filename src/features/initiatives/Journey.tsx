@@ -4,7 +4,7 @@ import { Card } from '../../components/Card';
 import { PhaseBadge } from '../../components/PhaseBadge';
 import { ExecutionStatusPill, ProgressPill } from '../../components/Pill';
 import shared from '../../components/shared.module.css';
-import styles from './ProjectDetailPage.module.css';
+import styles from './InitiativeDetailPage.module.css';
 
 function stepDetail(step: PhaseStep, previous: PhaseStep | undefined): string {
   if (step.lastExecution) {

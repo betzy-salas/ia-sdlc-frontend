@@ -6,6 +6,7 @@ import type {
   ChangeAgentStatusRequest,
   CreateAgentRequest,
   CreateAgentVersionRequest,
+  CreateInitiativeRequest,
   CreateProjectRequest,
   CreateSquadRequest,
   CreateStoryRequest,
@@ -14,6 +15,9 @@ import type {
   Execution,
   ExecutionFilters,
   ExecutionSummary,
+  Initiative,
+  InitiativeFilters,
+  InitiativeSummary,
   LoginRequest,
   Member,
   Phase,
@@ -50,14 +54,18 @@ export interface ApiClient {
   getAgent(agentId: string): Promise<Agent>;
   addAgentVersion(agentId: string, body: CreateAgentVersionRequest): Promise<Agent>;
   changeAgentStatus(agentId: string, body: ChangeAgentStatusRequest): Promise<Agent>;
-  // Proyectos e historias
+  // Proyectos
   listProjects(): Promise<ProjectSummary[]>;
   createProject(body: CreateProjectRequest): Promise<Project>;
   getProject(projectId: string): Promise<Project>;
-  addStory(projectId: string, body: CreateStoryRequest): Promise<Story>;
-  deleteStory(projectId: string, storyId: string): Promise<void>;
+  // Iniciativas e historias
+  createInitiative(projectId: string, body: CreateInitiativeRequest): Promise<Initiative>;
+  listInitiatives(filters?: InitiativeFilters): Promise<InitiativeSummary[]>;
+  getInitiative(initiativeId: string): Promise<Initiative>;
+  addStory(initiativeId: string, body: CreateStoryRequest): Promise<Story>;
+  deleteStory(initiativeId: string, storyId: string): Promise<void>;
   // Ejecución de la fase 1
-  executeRequirements(projectId: string): Promise<Execution>;
+  executeRequirements(initiativeId: string): Promise<Execution>;
   listExecutions(filters?: ExecutionFilters): Promise<ExecutionSummary[]>;
   getExecution(executionId: string): Promise<Execution>;
   // Aprobaciones

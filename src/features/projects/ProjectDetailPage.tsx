@@ -1,240 +1,95 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApi } from '../../api/apiContext';
-import {
-  DECISION_LABELS,
-  formatDateTime,
-  ORIGIN_LABELS,
-  PHASE_LABELS,
-  PHASE_ORDER,
-  ROLE_LABELS,
-} from '../../api/labels';
-import { invalidateWorkflow, queryKeys } from '../../api/queryKeys';
-import type { CreateStoryRequest, PhaseStep, Project, Story } from '../../api/types';
-import { Button } from '../../components/Button';
+import { PHASE_LABELS, PHASE_ORDER } from '../../api/labels';
+import { invalidateStructure, queryKeys } from '../../api/queryKeys';
+import type { InitiativeSummary } from '../../api/types';
+import { Button, ButtonLink } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { ErrorMessage } from '../../components/ErrorMessage';
-import { ArrowLeftIcon, CheckIcon, ClockIcon, SparkIcon, TrashIcon } from '../../components/icons';
+import { TextAreaField, TextField } from '../../components/Fields';
+import { ArrowLeftIcon } from '../../components/icons';
 import { PageHeader } from '../../components/PageHeader';
-import { Pill } from '../../components/Pill';
-import { RefinedStoryView } from '../../components/RefinedStoryView';
+import { PhaseBadge } from '../../components/PhaseBadge';
+import { PhaseTag } from '../../components/Pill';
 import shared from '../../components/shared.module.css';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
-import { Journey } from './Journey';
-import styles from './ProjectDetailPage.module.css';
-import { AssistedStoryForm, ExistingStoryForm } from './StoryForms';
+import styles from './Projects.module.css';
 
-type StoryFormMode = 'existing' | 'assisted' | null;
-
-/** Comentario de la última decisión (pedir cambios o rechazar) para saber qué corregir. */
-function LastDecisionNote({ step }: { step: PhaseStep }) {
+function NewInitiativeForm({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const api = useApi();
-  const last = step.lastExecution;
-  const decided = last !== null && (last.status === 'REWORK_REQUESTED' || last.status === 'REJECTED');
-  const execution = useQuery({
-    queryKey: queryKeys.execution(last?.id ?? ''),
-    queryFn: () => api.getExecution(last?.id ?? ''),
-    enabled: decided,
-  });
-  const decision = execution.data?.decision;
-  if (!decided || !decision) return null;
-  return (
-    <div className={`${styles.banner} ${styles.bannerNote}`}>
-      <span>
-        <strong>
-          {decision.decidedBy.fullName} {DECISION_LABELS[decision.decision].toLowerCase()}
-        </strong>{' '}
-        el {formatDateTime(decision.decidedAt)}.
-      </span>
-      {decision.comment && <span>Comentario: {decision.comment}</span>}
-    </div>
-  );
-}
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
-function StoryCard({
-  story,
-  canDelete,
-  onDelete,
-  deleting,
-}: {
-  story: Story;
-  canDelete: boolean;
-  onDelete: () => void;
-  deleting: boolean;
-}) {
+  const create = useMutation({
+    mutationFn: () => api.createInitiative(projectId, { name: name.trim(), description: description.trim() }),
+    onSuccess: async (initiative) => {
+      await invalidateStructure(queryClient);
+      navigate(`/initiatives/${initiative.id}`);
+    },
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    create.mutate();
+  }
+
   return (
-    <Card as="li" phase="REQUIREMENTS">
-      <div className={styles.storyHead}>
-        <div className={shared.main}>
-          <h3 className={styles.storyTitle}>{story.title}</h3>
-          <p className={shared.meta}>{ORIGIN_LABELS[story.origin]}</p>
-        </div>
-        {canDelete && (
-          <Button
-            variant="danger"
-            iconOnly
-            aria-label={`Quitar la historia ${story.title}`}
-            disabled={deleting}
-            onClick={onDelete}
-          >
-            <TrashIcon />
+    <Card as="section" aria-label="Nueva iniciativa">
+      <h3 className={shared.itemTitle}>Nueva iniciativa</h3>
+      <form className={shared.form} onSubmit={handleSubmit}>
+        <TextField
+          label="Nombre"
+          required
+          value={name}
+          onChange={setName}
+          hint="Un lote de trabajo del proyecto; empieza en la fase de Requerimientos."
+        />
+        <TextAreaField label="Descripción" value={description} onChange={setDescription} />
+        <ErrorMessage error={create.error} />
+        <div className={shared.actions}>
+          <Button type="submit" disabled={create.isPending}>
+            {create.isPending ? 'Creando…' : 'Crear iniciativa'}
           </Button>
-        )}
-      </div>
-      <div className={styles.columns}>
-        <div className={`${styles.column} ${styles.original}`}>
-          <h4 className={styles.columnLabel}>Original</h4>
-          <p className={styles.description}>{story.description}</p>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
         </div>
-        <div className={`${styles.column} ${styles.refined}`}>
-          <h4 className={styles.columnLabel}>Refinada por el agente</h4>
-          {story.refined ? (
-            <RefinedStoryView refined={story.refined} />
-          ) : (
-            <p className={shared.meta}>Aún sin refinar.</p>
-          )}
-        </div>
-      </div>
+      </form>
     </Card>
   );
 }
 
-function StoriesSection({ project }: { project: Project }) {
-  const api = useApi();
-  const queryClient = useQueryClient();
-  const [formMode, setFormMode] = useState<StoryFormMode>(null);
-
-  const requirements = project.journey.find((step) => step.phaseCode === 'REQUIREMENTS');
-  const progress = requirements?.progress;
-  const editable = progress === 'IN_PROGRESS';
-  const approver = requirements ? ROLE_LABELS[requirements.approverRole] : ROLE_LABELS.PRODUCT_OWNER;
-
-  const refreshProject = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
-    ]);
-
-  const addStory = useMutation({
-    mutationFn: (story: CreateStoryRequest) => api.addStory(project.id, story),
-    onSuccess: async () => {
-      await refreshProject();
-      setFormMode(null);
-    },
-  });
-
-  const deleteStory = useMutation({
-    mutationFn: (storyId: string) => api.deleteStory(project.id, storyId),
-    onSuccess: refreshProject,
-  });
-
-  const refine = useMutation({
-    mutationFn: () => api.executeRequirements(project.id),
-    // Aunque falle (por ejemplo PHASE_AWAITING_GATE), se refresca para mostrar el estado real.
-    onSettled: () => invalidateWorkflow(queryClient),
-  });
-
-  function openForm(mode: StoryFormMode) {
-    addStory.reset();
-    setFormMode(mode);
-  }
-
-  const formProps = {
-    onSubmit: (story: CreateStoryRequest) => addStory.mutate(story),
-    onCancel: () => openForm(null),
-    pending: addStory.isPending,
-    error: addStory.error,
-  };
-
+function InitiativeCard({ initiative }: { initiative: InitiativeSummary }) {
+  const to = `/initiatives/${initiative.id}`;
   return (
-    <section className={styles.section} aria-labelledby="stories-title">
-      <div className={styles.sectionHead}>
-        <h2 className={shared.sectionTitle} id="stories-title">
-          Historias ({project.stories.length})
-        </h2>
-        {editable && (
-          <div className={shared.actions}>
-            <Button variant="outline" aria-pressed={formMode === 'existing'} onClick={() => openForm('existing')}>
-              Ya tengo la historia
-            </Button>
-            <Button variant="outline" aria-pressed={formMode === 'assisted'} onClick={() => openForm('assisted')}>
-              Ayúdame a construirla
-            </Button>
-          </div>
-        )}
+    <Card as="li" row phase={initiative.currentPhase}>
+      <PhaseBadge phase={initiative.currentPhase} />
+      <div className={shared.main}>
+        <h3 className={shared.itemTitle}>
+          <Link to={to}>{initiative.name}</Link>
+        </h3>
+        <p className={shared.meta}>
+          {initiative.storyCount} {initiative.storyCount === 1 ? 'historia' : 'historias'}
+        </p>
       </div>
-
-      {progress === 'AWAITING_GATE' && (
-        <p className={`${styles.banner} ${styles.bannerPending}`} role="status">
-          <ClockIcon />
-          Pendiente de aprobación del {approver}
-          <Link to="/approvals">Ver en Por aprobar</Link>
-        </p>
-      )}
-      {progress === 'APPROVED' && (
-        <p className={`${styles.banner} ${styles.bannerApproved}`} role="status">
-          <CheckIcon />
-          Historias refinadas aprobadas por el {approver}
-        </p>
-      )}
-      {editable && requirements && <LastDecisionNote step={requirements} />}
-
-      {editable && formMode === 'existing' && <ExistingStoryForm {...formProps} />}
-      {editable && formMode === 'assisted' && <AssistedStoryForm {...formProps} />}
-
-      {project.stories.length === 0 ? (
-        formMode === null && (
-          <EmptyState
-            title="Este proyecto aún no tiene historias"
-            text="Agrega una historia que ya tengas escrita o constrúyela con ayuda."
-            action={
-              editable && (
-                <div className={shared.actions}>
-                  <Button onClick={() => openForm('existing')}>Ya tengo la historia</Button>
-                  <Button variant="outline" onClick={() => openForm('assisted')}>
-                    Ayúdame a construirla
-                  </Button>
-                </div>
-              )
-            }
-          />
-        )
-      ) : (
-        <ul className={shared.stack}>
-          {project.stories.map((story) => (
-            <StoryCard
-              key={story.id}
-              story={story}
-              canDelete={editable}
-              deleting={deleteStory.isPending}
-              onDelete={() => deleteStory.mutate(story.id)}
-            />
-          ))}
-        </ul>
-      )}
-
-      <ErrorMessage error={deleteStory.error} />
-      <ErrorMessage error={refine.error} />
-
-      {editable && (
-        <div className={shared.actions}>
-          <Button disabled={refine.isPending} onClick={() => refine.mutate()}>
-            <SparkIcon size={20} />
-            {refine.isPending ? 'El agente está refinando…' : 'Refinar con el agente'}
-          </Button>
-          <span className={shared.meta}>
-            El agente de refinamiento trabaja sobre todas las historias; después decide el {approver}.
-          </span>
-        </div>
-      )}
-    </section>
+      <PhaseTag>
+        Fase {PHASE_ORDER[initiative.currentPhase]} · {PHASE_LABELS[initiative.currentPhase]}
+      </PhaseTag>
+      <ButtonLink to={to} variant="outline">
+        Abrir<span className="visually-hidden"> {initiative.name}</span>
+      </ButtonLink>
+    </Card>
   );
 }
 
 export function ProjectDetailPage() {
   const { projectId = '' } = useParams();
   const api = useApi();
+  const [creating, setCreating] = useState(false);
   const project = useQuery({
     queryKey: queryKeys.project(projectId),
     queryFn: () => api.getProject(projectId),
@@ -252,27 +107,38 @@ export function ProjectDetailPage() {
         <ErrorState error={project.error} onRetry={() => void project.refetch()} />
       ) : (
         <>
-          <PageHeader
-            title={project.data.name}
-            subtitle={`Squad ${project.data.squad.name} · Recorrido por las fases y sus gates`}
-            actions={
-              <Pill tone="dark">
-                Fase {PHASE_ORDER[project.data.currentPhase]} · {PHASE_LABELS[project.data.currentPhase]}
-              </Pill>
-            }
-          />
+          <PageHeader title={project.data.name} subtitle={`Proyecto · Squad ${project.data.squad.name}`} />
           {project.data.description && (
             <Card as="section" aria-label="Descripción">
               <p className={styles.description}>{project.data.description}</p>
             </Card>
           )}
-          <section className={styles.section} aria-labelledby="journey-title">
-            <h2 className={shared.sectionTitle} id="journey-title">
-              Recorrido
-            </h2>
-            <Journey steps={project.data.journey} />
+          <section className={styles.section} aria-labelledby="initiatives-title">
+            <div className={styles.sectionHead}>
+              <h2 className={shared.sectionTitle} id="initiatives-title">
+                Iniciativas ({project.data.initiatives.length})
+              </h2>
+              {!creating && project.data.initiatives.length > 0 && (
+                <Button onClick={() => setCreating(true)}>Nueva iniciativa</Button>
+              )}
+            </div>
+            {creating && <NewInitiativeForm projectId={project.data.id} onClose={() => setCreating(false)} />}
+            {project.data.initiatives.length === 0 ? (
+              !creating && (
+                <EmptyState
+                  title="Este proyecto aún no tiene iniciativas"
+                  text="Una iniciativa es un lote de trabajo: tiene sus historias y recorre las cinco fases por su cuenta."
+                  action={<Button onClick={() => setCreating(true)}>Nueva iniciativa</Button>}
+                />
+              )
+            ) : (
+              <ul className={shared.stack}>
+                {project.data.initiatives.map((initiative) => (
+                  <InitiativeCard key={initiative.id} initiative={initiative} />
+                ))}
+              </ul>
+            )}
           </section>
-          <StoriesSection project={project.data} />
         </>
       )}
     </>

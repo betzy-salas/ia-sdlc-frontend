@@ -2,7 +2,7 @@
 
 Contrato REST entre `ia-sdlc-frontend` y `ia-sdlc-backend`. Este archivo se mantiene idéntico en los dos proyectos (`specs/contrato-api.md`).
 
-Alcance de la entrega 1: usuarios, squads y roles, catálogo de agentes, proyectos con historias y la fase 1 (Requerimientos): el agente de refinamiento se ejecuta desde la app y su resultado queda pendiente de aprobación del Product Owner.
+Alcance de la entrega 1: usuarios, squads y roles, catálogo de agentes, proyectos con iniciativas e historias, y la fase 1 (Requerimientos): el agente de refinamiento se ejecuta desde la app y su resultado queda pendiente de aprobación del Product Owner.
 
 - Prefijo: `/api/v1`
 - Formato: JSON; fechas ISO 8601 en UTC; ids como UUID en texto
@@ -91,19 +91,39 @@ Datos semilla: 1 REQUIREMENTS "Requerimientos" PRODUCT_OWNER; 2 ANALYSIS "Análi
 - `instructions` es el texto del `agent.md` de esa versión; se guarda pero no se devuelve en los listados (sí en `GET /agents/{id}` dentro de cada versión como `instructions`).
 - Dato semilla: "Agente de refinamiento", fase REQUIREMENTS, estado PILOT, versión `0.1.0`.
 
-## Proyectos e historias
+## Proyectos, iniciativas e historias
+
+Modelo de tres niveles:
+
+- **Proyecto**: lo estable. Tiene nombre, descripción y squad. No recorre fases.
+- **Iniciativa**: un lote de trabajo dentro de un proyecto. Es la unidad que recorre las fases y pasa por los gates. Un proyecto puede tener varias, cada una en una fase distinta.
+- **Historia**: pertenece a una iniciativa.
+
+### Proyectos
 
 | Método | Ruta | Body | Respuesta |
 |---|---|---|---|
 | GET | `/projects` | — | 200 `[projectSummary]` |
 | POST | `/projects` | `{ name, description, squadId }` | 201 `project` |
 | GET | `/projects/{projectId}` | — | 200 `project` |
-| POST | `/projects/{projectId}/stories` | `{ title, description, origin }` | 201 `story` |
-| DELETE | `/projects/{projectId}/stories/{storyId}` | — | 204 |
 
-`projectSummary`: `{ id, name, squad: { id, name }, currentPhase, storyCount }`
+`projectSummary`: `{ id, name, description, squad: { id, name }, initiativeCount }`
 
-`project`: `{ id, name, description, squad: { id, name }, currentPhase, stories: [story], journey: [phaseStep] }`
+`project`: `{ id, name, description, squad: { id, name }, initiatives: [initiativeSummary] }`
+
+### Iniciativas
+
+| Método | Ruta | Body | Respuesta |
+|---|---|---|---|
+| POST | `/projects/{projectId}/initiatives` | `{ name, description }` | 201 `initiative` |
+| GET | `/initiatives` | filtros `?projectId=&phase=` | 200 `[initiativeSummary]` |
+| GET | `/initiatives/{initiativeId}` | — | 200 `initiative` |
+| POST | `/initiatives/{initiativeId}/stories` | `{ title, description, origin }` | 201 `story` |
+| DELETE | `/initiatives/{initiativeId}/stories/{storyId}` | — | 204 |
+
+`initiativeSummary`: `{ id, name, project: { id, name }, squad: { id, name }, currentPhase, completed, storyCount, createdAt }`
+
+`initiative`: `{ id, name, description, project: { id, name }, squad: { id, name }, currentPhase, completed, stories: [story], journey: [phaseStep], createdAt }`
 
 `story`: `{ id, title, description, origin, refined: refinedStory | null }`
 
@@ -111,25 +131,28 @@ Datos semilla: 1 REQUIREMENTS "Requerimientos" PRODUCT_OWNER; 2 ANALYSIS "Análi
 
 `phaseStep`: `{ phaseCode, order, name, progress, approverRole, lastExecution: executionSummary | null }`
 
-- Un proyecto nuevo arranca con `currentPhase = REQUIREMENTS` y esa fase `IN_PROGRESS`; las demás `PENDING`.
-- Solo se agregan o borran historias mientras REQUIREMENTS esté `IN_PROGRESS`.
+- Una iniciativa nueva arranca con `currentPhase = REQUIREMENTS` y esa fase `IN_PROGRESS`; las demás `PENDING`. `completed` es `false` en esta entrega.
+- El squad de una iniciativa es el de su proyecto.
+- El nombre de la iniciativa es único dentro del proyecto (409 `DUPLICATE_NAME`).
+- Solo se agregan o borran historias mientras REQUIREMENTS esté `IN_PROGRESS` en esa iniciativa (si no, 409 `PHASE_AWAITING_GATE` o `PHASE_ALREADY_APPROVED`).
 - `story.refined` refleja la última ejecución no rechazada.
+- El filtro `phase` de `GET /initiatives` compara contra `currentPhase`.
 
 ## Ejecución de la fase 1
 
 | Método | Ruta | Body | Respuesta |
 |---|---|---|---|
-| POST | `/projects/{projectId}/phases/REQUIREMENTS/executions` | — | 201 `execution` |
-| GET | `/executions` | filtros `?projectId=&status=` | 200 `[executionSummary]` |
+| POST | `/initiatives/{initiativeId}/phases/REQUIREMENTS/executions` | — | 201 `execution` |
+| GET | `/executions` | filtros `?initiativeId=&projectId=&status=` | 200 `[executionSummary]` |
 | GET | `/executions/{executionId}` | — | 200 `execution` |
 
-Al crear la ejecución, el back toma el agente de la fase REQUIREMENTS en estado `PILOT` o `ACTIVE` con versión vigente, lo ejecuta sobre todas las historias del proyecto y guarda el resultado. En esta entrega la ejecución es síncrona: la respuesta ya llega en `PENDING_APPROVAL` (o `FAILED`). La fase queda `AWAITING_GATE`.
+Al crear la ejecución, el back toma el agente de la fase REQUIREMENTS en estado `PILOT` o `ACTIVE` con versión vigente, lo ejecuta sobre todas las historias de la iniciativa y guarda el resultado. En esta entrega la ejecución es síncrona: la respuesta ya llega en `PENDING_APPROVAL` (o `FAILED`). La fase de la iniciativa queda `AWAITING_GATE`.
 
-`executionSummary`: `{ id, project: { id, name }, phaseCode, agent: { id, name, version }, launchedBy: { id, fullName }, status, createdAt }`
+`executionSummary`: `{ id, initiative: { id, name }, project: { id, name }, phaseCode, agent: { id, name, version }, launchedBy: { id, fullName }, status, createdAt }`
 
 `execution`: `executionSummary` más `{ refinedStories: [{ storyId, originalTitle, refined: refinedStory }], decision: { decision, decidedBy: { id, fullName }, decidedAt, comment } | null }`
 
-Reglas: `NO_STORIES` si el proyecto no tiene historias; `AGENT_NOT_AVAILABLE` si no hay agente ejecutable; `PHASE_AWAITING_GATE` si ya hay una ejecución por aprobar; `PHASE_ALREADY_APPROVED` si la fase ya fue aprobada.
+Reglas: `NO_STORIES` si la iniciativa no tiene historias; `AGENT_NOT_AVAILABLE` si no hay agente ejecutable; `PHASE_AWAITING_GATE` si ya hay una ejecución por aprobar; `PHASE_ALREADY_APPROVED` si la fase ya fue aprobada.
 
 ## Aprobaciones
 
@@ -138,9 +161,9 @@ Reglas: `NO_STORIES` si el proyecto no tiene historias; `AGENT_NOT_AVAILABLE` si
 | GET | `/approvals/pending` | — | 200 `[execution]` |
 | POST | `/executions/{executionId}/decision` | `{ decision, comment }` | 200 `execution` |
 
-- La bandeja devuelve las ejecuciones `PENDING_APPROVAL` de proyectos cuyos squads tienen al usuario con el rol que aprueba esa fase (titular o suplente).
+- La bandeja devuelve las ejecuciones `PENDING_APPROVAL` de iniciativas cuyo squad (el de su proyecto) tiene al usuario con el rol que aprueba esa fase (titular o suplente).
 - Solo ese rol puede decidir; otro usuario recibe 403 `NOT_GATE_APPROVER`.
-- `APPROVE`: ejecución `ACCEPTED`, fase `APPROVED`, `currentPhase` pasa a `ANALYSIS` (que queda `IN_PROGRESS`).
+- `APPROVE`: ejecución `ACCEPTED`, fase `APPROVED`, el `currentPhase` de la iniciativa pasa a `ANALYSIS` (que queda `IN_PROGRESS`).
 - `REQUEST_REWORK` y `REJECT` exigen `comment`; la ejecución queda `REWORK_REQUESTED` o `REJECTED` y la fase vuelve a `IN_PROGRESS`.
 - Una ejecución ya decidida responde 409 `EXECUTION_ALREADY_DECIDED`.
 
@@ -148,4 +171,6 @@ Reglas: `NO_STORIES` si el proyecto no tiene historias; `AGENT_NOT_AVAILABLE` si
 
 | Método | Ruta | Respuesta |
 |---|---|---|
-| GET | `/dashboard/phases` | 200 `[{ phaseCode, order, name, approverRole, agents: [{ id, name, status }], projectsInPhase, pendingApprovals }]` |
+| GET | `/dashboard/phases` | 200 `[{ phaseCode, order, name, approverRole, agents: [{ id, name, status }], initiativesInPhase, pendingApprovals }]` |
+
+`initiativesInPhase` cuenta las iniciativas cuyo `currentPhase` es esa fase; `pendingApprovals`, las ejecuciones `PENDING_APPROVAL` de esa fase en toda la app.

@@ -6,7 +6,7 @@ import { ErrorMessage } from '../../components/ErrorMessage';
 import { TextAreaField, TextField } from '../../components/Fields';
 import shared from '../../components/shared.module.css';
 import { buildAssistedStory } from './assistedStory';
-import styles from './ProjectDetailPage.module.css';
+import styles from './InitiativeDetailPage.module.css';
 
 interface StoryFormProps {
   onSubmit: (story: CreateStoryRequest) => void;
