@@ -11,7 +11,6 @@ import { CheckboxField, SelectField, TextField } from '../../components/Fields';
 import { TrashIcon } from '../../components/icons';
 import { PageHeader } from '../../components/PageHeader';
 import { PhaseBadge } from '../../components/PhaseBadge';
-import { Pill } from '../../components/Pill';
 import shared from '../../components/shared.module.css';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import styles from './SquadsPage.module.css';
@@ -127,44 +126,57 @@ function SquadRoles({ squad }: { squad: Squad }) {
       ]),
   });
 
+  function renderColumn(role: SquadRole, substitute: boolean) {
+    const label = substitute ? 'Suplente' : 'Titular';
+    const members = squad.members.filter((member) => member.role === role && member.substitute === substitute);
+    return (
+      <div className={styles.column}>
+        <span className={styles.columnLabel}>{label}</span>
+        {members.length === 0 ? (
+          <p className={styles.none}>Sin asignar</p>
+        ) : (
+          <ul className={styles.members} aria-label={`${label} de ${ROLE_LABELS[role]}`}>
+            {members.map((member) => (
+              <li key={member.id} className={styles.member}>
+                <span className={styles.memberName}>{member.fullName}</span>
+                <Button
+                  variant="danger"
+                  iconOnly
+                  aria-label={`Retirar a ${member.fullName} como ${label.toLowerCase()} de ${ROLE_LABELS[role]}`}
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate(member.id)}
+                >
+                  <TrashIcon size={20} />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       <ErrorMessage error={remove.error} />
+      <div className={styles.columnsHeader} aria-hidden="true">
+        <span>Rol</span>
+        <span>Titular</span>
+        <span>Suplente</span>
+      </div>
       <ul className={shared.stack}>
-        {SQUAD_ROLES.map((role) => {
-          const members = squad.members
-            .filter((member) => member.role === role)
-            .sort((a, b) => Number(a.substitute) - Number(b.substitute));
-          return (
-            <Card as="li" row key={role} phase={PHASE_BY_ROLE[role]}>
-              <PhaseBadge phase={PHASE_BY_ROLE[role]} />
-              <h3 className={styles.roleName}>{ROLE_LABELS[role]}</h3>
-              {members.length === 0 ? (
-                <p className={styles.none}>Nadie ocupa este rol todavía.</p>
-              ) : (
-                <ul className={styles.members}>
-                  {members.map((member) => (
-                    <li key={member.id} className={styles.member}>
-                      <span className={styles.memberName}>{member.fullName}</span>
-                      <Pill tone={member.substitute ? 'neutral' : 'dark'}>
-                        {member.substitute ? 'Suplente' : 'Titular'}
-                      </Pill>
-                      <Button
-                        variant="danger"
-                        iconOnly
-                        aria-label={`Retirar a ${member.fullName} del rol ${ROLE_LABELS[role]}`}
-                        disabled={remove.isPending}
-                        onClick={() => remove.mutate(member.id)}
-                      >
-                        <TrashIcon size={20} />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          );
-        })}
+        {SQUAD_ROLES.map((role) => (
+          <Card as="li" key={role} phase={PHASE_BY_ROLE[role]}>
+            <div className={styles.roleRow}>
+              <div className={styles.roleCell}>
+                <PhaseBadge phase={PHASE_BY_ROLE[role]} />
+                <h3 className={styles.roleName}>{ROLE_LABELS[role]}</h3>
+              </div>
+              {renderColumn(role, false)}
+              {renderColumn(role, true)}
+            </div>
+          </Card>
+        ))}
       </ul>
     </>
   );

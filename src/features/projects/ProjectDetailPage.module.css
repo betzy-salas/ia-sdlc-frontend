@@ -60,7 +60,7 @@
 
 /* Historias */
 .formTitle {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -125,7 +125,7 @@
 
 .storyTitle {
   font-family: var(--font-body);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }

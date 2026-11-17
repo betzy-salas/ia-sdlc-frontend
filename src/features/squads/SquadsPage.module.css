@@ -7,22 +7,68 @@
   padding: 0;
 }
 
+/* Rol | Titular | Suplente: mismas columnas en el encabezado y en cada fila. */
+.columnsHeader,
+.roleRow {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr);
+  gap: 8px 20px;
+}
+
+.columnsHeader {
+  padding: 0 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.roleRow {
+  align-items: start;
+}
+
+.roleCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.roleName {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* En pantallas anchas el encabezado ya nombra la columna. */
+.columnLabel {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
 .members {
-  flex: 2 1 260px;
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+  gap: 4px;
 }
 
 .member {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .memberName {
@@ -30,15 +76,25 @@
   overflow-wrap: anywhere;
 }
 
-.roleName {
-  flex: 1 1 160px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 16px;
-}
-
 .none {
-  flex: 2 1 260px;
+  margin: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   font-size: 14px;
   color: var(--color-text-secondary);
+}
+
+@media (max-width: 720px) {
+  .columnsHeader {
+    display: none;
+  }
+
+  .roleRow {
+    grid-template-columns: 1fr;
+  }
+
+  .columnLabel {
+    display: block;
+  }
 }
