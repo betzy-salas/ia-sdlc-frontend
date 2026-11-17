@@ -5,8 +5,9 @@ Guía para validar y corregir el back y el front sin internet (por ejemplo, en u
 ## Estado al momento de escribir esta guía
 
 - **Front**: compila, pasa lint y sus 28 pruebas. Probado solo en modo demo (datos en memoria).
-- **Back**: código completo, pero **nunca se ha compilado con Maven ni ejecutado**. Sus 32 pruebas no han corrido.
+- **Back**: código completo, pero **nunca se ha compilado con Maven ni ejecutado**. Sus 37 pruebas no han corrido con Maven.
 - **Front + back juntos**: sin probar.
+- **Modelo**: proyecto → iniciativa → historia. El proyecto es lo estable (nombre, descripción y squad); la iniciativa es la que recorre las fases, tiene las historias y pasa por los gates. Un proyecto puede tener varias iniciativas, cada una en su fase.
 
 ## 1. Antes de quedarte sin conexión
 
@@ -38,6 +39,7 @@ docker compose ps        # debe decir "healthy"
 
 - `docker compose pull` descarga la imagen de PostgreSQL: **sin internet no se puede**, hazlo antes.
 - Si no usas Docker, deja instalado un PostgreSQL local con la base, el usuario y la clave `iasdlc` (ver README).
+- Si ya tenías la base creada con el modelo anterior (sin iniciativas), **recréala**: `docker compose down -v` y `docker compose up -d`. El esquema (`V1__schema.sql`) se reescribió y Flyway rechaza una base creada con la versión anterior.
 
 ### Dependencias del back
 
@@ -108,6 +110,8 @@ curl -s -X POST http://localhost:8080/api/v1/auth/register \
 
 Debe responder 201 con `token` y `user`.
 
+Si quieres recorrer todo el flujo por consola antes de abrir el front (proyecto → iniciativa → historias → refinar → aprobar), usa la sección "Flujo de prueba con curl" del README del back.
+
 ### Paso 3 — Levantar el front contra el back real
 
 ```
@@ -131,35 +135,39 @@ Marca cada paso que funcione.
 - [ ] Agregar al segundo usuario como desarrollador.
 - [ ] Agentes: aparece "Agente de refinamiento" en piloto, versión 0.1.0.
 - [ ] Agentes: registrar un agente nuevo y una versión.
-- [ ] Proyectos: crear un proyecto apuntando al squad (nombre, descripción, squad).
-- [ ] En el proyecto: crear una iniciativa con «Nueva iniciativa» (nombre, descripción); abre el detalle de la iniciativa con el recorrido por las cinco fases.
+- [ ] Proyectos: crear un proyecto apuntando al squad. El proyecto no muestra fase ni historias: solo nombre, descripción, squad y sus iniciativas.
+- [ ] Dentro del proyecto: crear una iniciativa. Arranca en la fase de Requerimientos.
 - [ ] En la iniciativa: agregar una historia con "Ya tengo la historia".
-- [ ] Agregar una historia con "Ayúdame a construirla".
+- [ ] En la iniciativa: agregar una historia con "Ayúdame a construirla".
 - [ ] Pulsar "Refinar con el agente": aparece el resultado refinado y el estado pendiente de aprobación.
-- [ ] Por aprobar: el Product Owner ve la ejecución, con el nombre de la iniciativa y el del proyecto; el contador del menú muestra 1.
+- [ ] Por aprobar: el Product Owner ve la ejecución (con el nombre de la iniciativa y del proyecto); el contador del menú muestra 1.
 - [ ] Iniciar sesión con el segundo usuario: "Por aprobar" está vacío.
 - [ ] Con el Product Owner: "Pedir cambios" sin comentario muestra error; con comentario funciona.
 - [ ] Refinar de nuevo y aprobar: la iniciativa pasa a la fase de Análisis.
-- [ ] Volver al proyecto y crear una segunda iniciativa: queda en Requerimientos mientras la primera sigue en Análisis (cada tarjeta muestra su fase).
+- [ ] En el mismo proyecto: crear una segunda iniciativa. Arranca en Requerimientos aunque la primera ya esté en Análisis.
+- [ ] Crear otra iniciativa con el mismo nombre de una existente en ese proyecto: muestra error (nombre duplicado).
+- [ ] El proyecto muestra sus dos iniciativas, cada una con su fase.
 - [ ] Ejecuciones: aparecen las dos ejecuciones con su estado, su iniciativa y su proyecto.
-- [ ] Inicio: las tarjetas de fase muestran el conteo de iniciativas y de pendientes.
+- [ ] Inicio: las tarjetas de fase muestran los conteos de iniciativas por fase (una en Análisis, una en Requerimientos).
 - [ ] Reiniciar el back: los datos siguen ahí (PostgreSQL).
 
 ## 3. Dónde es más probable que falle el back
 
-La lógica de negocio (dominio y casos de uso) sí se compiló y se recorrió con datos en memoria. Lo que nunca se ha ejecutado es la capa de Spring. Sospechosos, del más al menos probable:
+La lógica de negocio (dominio y casos de uso) sí se compiló y se recorrió con datos en memoria, también con el modelo de iniciativas (dos iniciativas en un proyecto, una aprobada y la otra todavía en Requerimientos). Lo que nunca se ha ejecutado es la capa de Spring. Sospechosos, del más al menos probable:
 
 | Síntoma | Causa probable | Dónde mirar |
 |---|---|---|
 | Errores de compilación en `infrastructure` | Tipos o imports que nunca se compilaron con las librerías reales | El archivo y la línea que indique Maven |
 | En las pruebas: "Migration V1 failed" o error de SQL | Las migraciones se probaron en PostgreSQL, no en H2, que es lo que usan las pruebas | `src/main/resources/db/migration/V1__schema.sql` |
+| Al arrancar: "Migration checksum mismatch" o "Validate failed" | La base se creó con el esquema anterior (sin iniciativas) | Recrear la base: `docker compose down -v` y `docker compose up -d` |
 | Al arrancar: "Connection refused" o falla de autenticación | PostgreSQL no está arriba o las credenciales no coinciden | `docker compose ps`; variables `IASDLC_DB_*` |
-| Arranca, pero falla al guardar o consultar | Una entidad JPA no coincide con las tablas | `infrastructure/persistence`. Truco: pon `spring.jpa.hibernate.ddl-auto: validate` en `application.yml` para que el desajuste aparezca al arrancar, con el nombre de la columna |
+| Arranca, pero falla al guardar o consultar | Una entidad JPA no coincide con las tablas (las más nuevas: `InitiativeEntity`, `StoryEntity` y `ExecutionEntity` con `initiative_id`) | `infrastructure/persistence`. Truco: pon `spring.jpa.hibernate.ddl-auto: validate` en `application.yml` para que el desajuste aparezca al arrancar, con el nombre de la columna |
 | "No qualifying bean" o "UnsatisfiedDependency" | Un caso de uso o adaptador no quedó registrado como bean | La anotación `@UseCase` y la configuración que la escanea |
 | Todo responde 401 o 403, incluso registro e inicio de sesión | Rutas públicas mal declaradas en la seguridad | `infrastructure/security` |
 | El navegador muestra error de CORS | Origen no permitido | `iasdlc.cors.allowed-origins` en `application.yml` |
 | Error al generar el token | Secreto JWT muy corto o API de jjwt distinta | `infrastructure/security`, propiedad `iasdlc.security.jwt.secret` |
 | El JSON llega con nombres distintos a los del contrato | DTO o mapper | `infrastructure/web` y `specs/contrato-api.md` |
+| El front recibe 404 al agregar historias o al refinar | Llama a las rutas anteriores (`/projects/{id}/stories`, `/projects/{id}/phases/...`); ahora cuelgan de `/initiatives/{id}` | Cliente de API del front y `specs/contrato-api.md` |
 
 Si el fallo aparece en el front solo cuando usa el back real, compara la respuesta del back (pestaña Red del navegador) con `specs/contrato-api.md`: el que se aparte del contrato es el que hay que corregir.
 
